@@ -1,0 +1,44 @@
+{
+  "inputs": [
+    {
+      "name": "birthday",
+      "public": false,
+      "type": "field"
+    },
+    {
+      "name": "delta",
+      "public": true,
+      "type": "field"
+    },
+    {
+      "name": "today",
+      "public": true,
+      "type": "field"
+    },
+    {
+      "name": "is_younger",
+      "public": true,
+      "type": "field"
+    },
+    {
+      "name": "photo_hash",
+      "public": true,
+      "type": "field"
+    },
+    {
+      "name": "contract",
+      "public": true,
+      "type": "field"
+    },
+    {
+      "name": "nonce",
+      "public": false,
+      "type": "field"
+    }
+  ],
+  "outputs": [
+    {
+      "type": "field"
+    }
+  ]
+}

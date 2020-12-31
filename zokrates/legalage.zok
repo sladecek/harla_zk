@@ -1,0 +1,8 @@
+import "hashes/mimc7/mimc7R10"
+
+def main (private field birthday, field delta, field today, field is_younger, field photo_hash, field contract, private field nonce) -> field:
+    assert(if is_younger==0 then birthday + delta < today else birthday + delta > today fi)
+    return mimc7R10(birthday + nonce, photo_hash * contract)
+
+
+  
