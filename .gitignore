@@ -7,3 +7,6 @@ zokrates/proof.json
 /.idea/
 /zokrates/witness
 /zokrates/out.ztf
+/proof-qr.jpg
+/proof.json
+/prover-db.json

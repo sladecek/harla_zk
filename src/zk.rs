@@ -47,11 +47,11 @@ fn compute_mimc7r10_hash(x: &Bn128Field, k: &Bn128Field) -> Bn128Field {
     mimc2zok(hash)
 }
 
-pub fn generate_prover_key(private: Private, contract: Vec<u8>, photo_hash: Vec<u8>) -> Vec<u8> {
-    let nonce = Bn128Field::from_byte_vector(private.nonce);
+pub fn generate_prover_key(private: &Private, contract: &Vec<u8>, photo_hash: &Vec<u8>) -> Vec<u8> {
+    let nonce = Bn128Field::from_byte_vector(private.nonce.to_vec());
     let birthday = Bn128Field::from(private.birthday);
-    let photo_hash = Bn128Field::from_byte_vector(photo_hash);
-    let contract = Bn128Field::from_byte_vector(contract);
+    let photo_hash = Bn128Field::from_byte_vector(photo_hash.to_vec());
+    let contract = Bn128Field::from_byte_vector(contract.to_vec());
 
     let card_key = compute_mimc7r10_hash(&(birthday + nonce), &(photo_hash * contract));
     card_key.into_byte_vector()
@@ -234,7 +234,7 @@ mod tests {
         };
         let photo_hash = bn128("3").into_byte_vector();
         let contract = bn128("4").into_byte_vector();
-        let key = super::generate_prover_key(private, photo_hash, contract);
+        let key = super::generate_prover_key(&private, &photo_hash, &contract);
         assert_eq!(32, key.len());
 
         assert_eq!(Bn128Field::from_byte_vector(key), m1);

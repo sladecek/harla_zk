@@ -6,7 +6,7 @@ use std::str::FromStr;
 use chrono::{Datelike, NaiveDate};
 
 /// The relation to be proved.
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug, Copy, Clone)]
 pub enum Relation {
     Younger,
     Older,
@@ -63,7 +63,7 @@ impl PublicChain {
 }
 
 /// Private part of the proof
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Private {
     /// Birthday - julian daprote. Private part of the proof.
     pub birthday: i32,
@@ -84,12 +84,14 @@ impl Private {
     }
 }
 
+static COMMON_ERA_JD: i32 = 1721425;
+
+pub fn naive_date_to_jd(nd: NaiveDate) -> i32 {
+    nd.num_days_from_ce() + COMMON_ERA_JD
+}
+
 pub fn age_to_delta(birthday: i32, age: i32, relation: Relation) -> i32 {
-    println!(
-        "age_to_delta birthday={} age={} relation={:?}",
-        birthday, age, relation
-    );
-    let dbirth = NaiveDate::from_num_days_from_ce(birthday - 1721425);
+    let dbirth = NaiveDate::from_num_days_from_ce(birthday - COMMON_ERA_JD);
     let dtest =
         NaiveDate::from_ymd_opt(dbirth.year() + age, dbirth.month(), dbirth.day()).unwrap_or(
             NaiveDate::from_ymd(dbirth.year() + age, dbirth.month(), dbirth.day() - 1),
@@ -192,7 +194,6 @@ impl ProofQrCode {
 
 impl ToString for ProofQrCode {
     fn to_string(&self) -> String {
-        println!("leela");
         let parts = vec![self.public_to_string(), self.proof_to_string()];
         parts.join(";")
     }
