@@ -108,20 +108,16 @@ pub fn generate_proof(rq: QrRequest) -> Result<ProofQrCode, String> {
 
     let outs = witness.return_values();
     assert_eq!(1, outs.len());
-    let out = &outs[0];
+    //    let out = &outs[0];
 
-    let proof1 = G16::generate_proof(prg.clone(), witness.clone(), PROVING_KEY.to_vec()); 
-    let proof = G16::generate_proof(prg, witness, PROVING_KEY.to_vec()); 
-    let bellman_proof = &proof1.proof.into_bellman::<Bn128Field>();
+    let proof = G16::generate_proof(prg, witness, PROVING_KEY.to_vec());
+    let bellman_proof = &proof.proof.into_bellman::<Bn128Field>();
     let mut proof_bytes: Vec<u8> = Vec::new();
     bellman_proof.write(&mut proof_bytes).unwrap();
-    
+
     let qr = ProofQrCode {
         public: rq.qr,
-	proof_bytes,
-        proof: format!(r#""a":[{}], "b":[{}], "c":[{}]"#, proof.proof.a.to_string(),
-		       proof.proof.b.to_string(),
-		       proof.proof.c.to_string())
+        proof: proof_bytes,
     };
     Ok(qr)
 }
@@ -133,19 +129,16 @@ pub fn verify_proof(qr: &ProofQrCode, chain: &PublicChain) -> Result<(), String>
     let mut inputs: Vec<Bn128Field> = Vec::new();
 
     // Inverting the relation.
-    let delta = qr.public.delta;
-    let today = qr.public.today;
     let is_younger = qr.public.relation == Relation::Younger;
-
-    inputs.push(Bn128Field::from(delta));
-    inputs.push(Bn128Field::from(today));
+    inputs.push(Bn128Field::from(qr.public.delta));
+    inputs.push(Bn128Field::from(qr.public.today));
     inputs.push(Bn128Field::from(if is_younger { 1 } else { 0 }));
     inputs.push(Bn128Field::from_byte_vector(chain.photo_hash.clone()));
     inputs.push(Bn128Field::from_byte_vector(qr.public.contract.clone()));
 
     inputs.push(Bn128Field::from_byte_vector(chain.prover_key.clone()));
 
-    let mut rdr = Cursor::new(&qr.proof_bytes);
+    let mut rdr = Cursor::new(&qr.proof);
     let proof = BellmanProof::<Bn256>::read(&mut rdr)
         .map_err(|_| QrError {})
         .unwrap();
@@ -175,9 +168,9 @@ pub fn verify_proof(qr: &ProofQrCode, chain: &PublicChain) -> Result<(), String>
 #[cfg(test)]
 mod tests {
     use super::*;
-//    use crate::api::{Private, ProofQrCode, PublicQr, QrRequest, Relation};
-        use crate::api::{Private,  PublicQr, QrRequest, Relation};
-//    use std::str::FromStr;
+
+    use crate::api::{Private, PublicQr, QrRequest, Relation};
+    use std::str::FromStr;
     use zokrates_field::Bn128Field;
 
     fn bn128(s: &str) -> Bn128Field {
@@ -270,18 +263,19 @@ mod tests {
         };
 
         let p = super::generate_proof(rq).unwrap();
-	println!("{}", p.to_string());
-//        assert_eq!(result, super::verify_proof(&p, &chain).is_ok());
-  //      let pp = ProofQrCode::from_str(&p.to_string()).unwrap();
-// TODO	println!("{:?}",pp);
-	//        assert_eq!(result, super::verify_proof(&pp, &chain).is_ok());
+        println!("{}", p.to_string());
+        assert_eq!(result, super::verify_proof(&p, &chain).is_ok());
+        let pp = ProofQrCode::from_str(&p.to_string()).unwrap();
+        println!("{}", pp.to_string());
+        assert_eq!(result, super::verify_proof(&pp, &chain).is_ok());
+        println!("------------------");
     }
 
     #[test]
     fn verify_older() {
         test_verification(2020, 2001, Relation::Older, 18, true);
     }
-/*
+
     #[test]
     fn verify_younger() {
         test_verification(2020, 2001, Relation::Younger, 21, true);
@@ -302,5 +296,4 @@ mod tests {
     fn verify_marginal_case_younger() {
         test_verification(2020, 2000, Relation::Older, 20, false);
     }
-     */
 }

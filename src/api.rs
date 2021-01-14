@@ -1,9 +1,6 @@
-use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
-use std::io::{Cursor, Read, Write};
-
-use std::str::FromStr;
-use regex::{Captures,Regex};
 use chrono::{Datelike, NaiveDate};
+use serde::{Deserialize, Serialize};
+use std::str::FromStr;
 
 /// The relation to be proved.
 #[derive(PartialEq, Debug, Copy, Clone)]
@@ -46,11 +43,9 @@ impl PublicQr {
             self.today,
             self.delta,
             self.relation.clone() as u8,
-	    hex::encode(&self.contract)
-		
+            hex::encode(&self.contract)
         )
     }
-
 }
 
 /// Public part of the proof. The fields stored on-chain.
@@ -154,59 +149,38 @@ impl QrRequest {
 /// verified by the verifier
 #[derive(Debug, Clone)]
 pub struct ProofQrCode {
-    /// Public part of the proof.
+    /// Public parameters
     pub public: PublicQr,
-
-    // Proof a,b,c curve points.
-    pub proof: String,
-
-    pub proof_bytes: Vec<u8>,
+    /// elliptic curve points packed
+    pub proof: Vec<u8>,
 }
 
 #[derive(Debug, Clone)]
 pub struct QrError {}
 
-impl ProofQrCode {
-    pub fn public_to_string(&self) -> String {
-        let mut wtr = vec![];
-        wtr.write_i32::<BigEndian>(self.public.today).unwrap();
-        wtr.write_i32::<BigEndian>(self.public.delta).unwrap();
-        wtr.push(self.public.relation.clone() as u8);
-        wtr.write_all(&self.public.contract.clone()).unwrap();
-        bs58::encode(wtr).into_string()
-    }
-
-    pub fn public_from_str(s: &str) -> Result<PublicQr, QrError> {
-        let mut rdr = Cursor::new(bs58::decode(s).into_vec().map_err(|_| QrError {})?);
-
-        let today = rdr.read_i32::<BigEndian>().map_err(|_| QrError {})?;
-        let delta = rdr.read_i32::<BigEndian>().map_err(|_| QrError {})?;
-        const YOUNGER: u8 = Relation::Younger as u8;
-        let relation = match rdr.read_u8().map_err(|_| QrError {})? {
-            YOUNGER => Relation::Younger,
-            _ => Relation::Older,
-        };
-        let mut contract: Vec<u8> = Vec::new();
-        rdr.read_to_end(&mut contract).unwrap();
-
-        Ok(PublicQr {
-            today,
-            delta,
-            relation,
-            contract,
-        })
-    }
-
-
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct QrJson {
+    pub today: i32,
+    pub relation: u8,
+    pub delta: i32,
+    pub contract: String,
+    pub proof: String,
 }
 
 impl ToString for ProofQrCode {
     fn to_string(&self) -> String {
-	let unescaped = format!(r#"{{ {}, "proof": {{ {} }} }}"#, self.public.to_json(), self.proof.clone());
-	let re = Regex::new("(0x[01234567890abcdef]+)").unwrap();
-	re.replace_all(&unescaped, |caps: &Captures| {
-	    format!("\"{}\"", &caps[1])
-	}).to_string()
+        let js = QrJson {
+            today: self.public.today,
+            relation: if self.public.relation == Relation::Younger {
+                1
+            } else {
+                0
+            },
+            delta: self.public.delta,
+            contract: String::from("0x") + &hex::encode(self.public.contract.clone()),
+            proof: bs58::encode(&self.proof).into_string(),
+        };
+        serde_json::to_string(&js).unwrap()
     }
 }
 
@@ -214,15 +188,23 @@ impl FromStr for ProofQrCode {
     type Err = QrError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let parts: Vec<&str> = s.split(';').collect();
-        if parts.len() != 2 {
-            Err(QrError {})
-        } else {
-            Ok(ProofQrCode {
-                public: Self::public_from_str(parts[0])?,
-                proof_bytes: Vec::new(), // TODO
-                proof: String::from(parts[1]),
-            })
-        }
+        let p: QrJson = serde_json::from_str(s).map_err(|_| QrError {})?;
+	let mut contract = p.contract;
+	if contract.starts_with("0x") {
+	    contract = String::from(&contract[2..]);
+	}
+        Ok(ProofQrCode {
+            public: PublicQr {
+                today: p.today,
+                relation: if p.relation == 0 {
+                    Relation::Older
+                } else {
+                    Relation::Younger
+                },
+                delta: p.delta,
+                contract: hex::decode(contract).map_err(|_| QrError {})?,
+            },
+            proof: bs58::decode(&p.proof).into_vec().map_err(|_| QrError {})?,
+        })
     }
 }
