@@ -1,15 +1,17 @@
-use chrono::{Datelike, Local, NaiveDate};
 /// Command line utility to simulate a 'LegalAge' prover.
+use chrono::{Datelike, Local, NaiveDate};
 use clap::{App, Arg};
 use harla_zk::api::{
     age_to_delta, naive_date_to_jd, Private, PublicChain, PublicQr, QrRequest, Relation,
 };
 use harla_zk::zk::{generate_proof, generate_prover_key};
 use image::Luma;
+use num_bigint::BigUint;
 use qrcode::QrCode;
 use serde::{Deserialize, Serialize};
 use serde_json;
 use std::fs;
+use std::str::FromStr;
 
 #[derive(Debug, PartialEq, Clone)]
 struct Parameters {
@@ -24,15 +26,15 @@ struct Parameters {
 fn main() {
     let p = parse_arguments();
     let pdb: ProverDb = serde_json::from_str(&fs::read_to_string(&p.prover_db).unwrap()).unwrap();
-    let nonce = bs58::decode(pdb.nonce)
-        .into_vec()
-        .expect("cannot decode bs58 'nonce' in the proverDb file");
-    let contract = bs58::decode(pdb.contract)
-        .into_vec()
-        .expect("cannot decode bs58 'contract' in the proverDb file");
-    let photo_hash = bs58::decode(pdb.photo_hash)
-        .into_vec()
-        .expect("cannot decode bs58 'photo_hash' in the proverDb file");
+    let nonce = BigUint::from_str(&pdb.nonce)
+        .expect("cannot decode 'nonce' in the proverDb file")
+        .to_bytes_be();
+    let contract = BigUint::from_str(&pdb.contract)
+        .expect("cannot decode 'contract' in the proverDb file")
+        .to_bytes_be();
+    let photo_hash = BigUint::from_str(&pdb.photo_hash)
+        .expect("cannot decode 'photo_hash' in the proverDb file")
+        .to_bytes_be();
 
     let delta = age_to_delta(pdb.birthday, p.age, p.relation);
     let private = Private {
@@ -55,16 +57,22 @@ fn main() {
         private,
     };
     let proof = generate_proof(rq).unwrap();
+    let ps = proof.to_string();
     let qrf = QrFile {
-        qr: proof.to_string(),
+        qr: ps.clone()
     };
-    let json: String = serde_json::to_string(&qrf).unwrap();
-    fs::write(p.proof, json).unwrap();
+//    let json: String = serde_json::to_string(&qrf).unwrap();
+    fs::write(p.proof, ps).unwrap();
+//    fs::write(p.proof, json).unwrap();
 
     let code = QrCode::new(qrf.qr).unwrap();
     let image = code.render::<Luma<u8>>().build();
     image.save(p.qr).unwrap();
-    let string = code.render().light_color('\u{2b1c}').dark_color('\u{2b1b}').build();
+    let string = code
+        .render()
+        .light_color('\u{2b1c}')
+        .dark_color('\u{2b1b}')
+        .build();
     println!("{}", string);
 }
 

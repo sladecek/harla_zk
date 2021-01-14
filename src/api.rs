@@ -2,7 +2,7 @@ use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use std::io::{Cursor, Read, Write};
 
 use std::str::FromStr;
-
+use regex::{Captures,Regex};
 use chrono::{Datelike, NaiveDate};
 
 /// The relation to be proved.
@@ -39,6 +39,18 @@ impl PublicQr {
             contract: Vec::new(),
         }
     }
+
+    pub fn to_json(&self) -> String {
+        format!(
+            r#""today": {}, "delta": {}, "relation":{}, "contract": 0x{}"#,
+            self.today,
+            self.delta,
+            self.relation.clone() as u8,
+	    hex::encode(&self.contract)
+		
+        )
+    }
+
 }
 
 /// Public part of the proof. The fields stored on-chain.
@@ -146,7 +158,9 @@ pub struct ProofQrCode {
     pub public: PublicQr,
 
     // Proof a,b,c curve points.
-    pub proof: Vec<u8>,
+    pub proof: String,
+
+    pub proof_bytes: Vec<u8>,
 }
 
 #[derive(Debug, Clone)]
@@ -183,19 +197,16 @@ impl ProofQrCode {
         })
     }
 
-    pub fn proof_to_string(&self) -> String {
-        bs58::encode(&self.proof).into_string()
-    }
 
-    pub fn proof_from_str(s: &str) -> Result<Vec<u8>, QrError> {
-        bs58::decode(s).into_vec().map_err(|_| QrError {})
-    }
 }
 
 impl ToString for ProofQrCode {
     fn to_string(&self) -> String {
-        let parts = vec![self.public_to_string(), self.proof_to_string()];
-        parts.join(";")
+	let unescaped = format!(r#"{{ {}, "proof": {{ {} }} }}"#, self.public.to_json(), self.proof.clone());
+	let re = Regex::new("(0x[01234567890abcdef]+)").unwrap();
+	re.replace_all(&unescaped, |caps: &Captures| {
+	    format!("\"{}\"", &caps[1])
+	}).to_string()
     }
 }
 
@@ -209,7 +220,8 @@ impl FromStr for ProofQrCode {
         } else {
             Ok(ProofQrCode {
                 public: Self::public_from_str(parts[0])?,
-                proof: Self::proof_from_str(parts[1])?,
+                proof_bytes: Vec::new(), // TODO
+                proof: String::from(parts[1]),
             })
         }
     }
