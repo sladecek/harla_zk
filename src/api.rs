@@ -189,10 +189,10 @@ impl FromStr for ProofQrCode {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let p: QrJson = serde_json::from_str(s).map_err(|_| QrError {})?;
-	let mut contract = p.contract;
-	if contract.starts_with("0x") {
-	    contract = String::from(&contract[2..]);
-	}
+        let mut contract = p.contract;
+        if contract.starts_with("0x") {
+            contract = String::from(&contract[2..]);
+        }
         Ok(ProofQrCode {
             public: PublicQr {
                 today: p.today,

@@ -6,12 +6,11 @@ use harla_zk::api::{
 };
 use harla_zk::zk::{generate_proof, generate_prover_key};
 use image::Luma;
-use num_bigint::BigUint;
 use qrcode::QrCode;
 use serde::{Deserialize, Serialize};
 use serde_json;
 use std::fs;
-use std::str::FromStr;
+use zokrates_field::{Bn128Field, Field};
 
 #[derive(Debug, PartialEq, Clone)]
 struct Parameters {
@@ -26,15 +25,15 @@ struct Parameters {
 fn main() {
     let p = parse_arguments();
     let pdb: ProverDb = serde_json::from_str(&fs::read_to_string(&p.prover_db).unwrap()).unwrap();
-    let nonce = BigUint::from_str(&pdb.nonce)
+    let nonce = Bn128Field::try_from_dec_str(&pdb.nonce)
         .expect("cannot decode 'nonce' in the proverDb file")
-        .to_bytes_be();
-    let contract = BigUint::from_str(&pdb.contract)
+        .into_byte_vector();
+    let contract = Bn128Field::try_from_dec_str(&pdb.contract)
         .expect("cannot decode 'contract' in the proverDb file")
-        .to_bytes_be();
-    let photo_hash = BigUint::from_str(&pdb.photo_hash)
+        .into_byte_vector();
+    let photo_hash = Bn128Field::try_from_dec_str(&pdb.photo_hash)
         .expect("cannot decode 'photo_hash' in the proverDb file")
-        .to_bytes_be();
+        .into_byte_vector();
 
     let delta = age_to_delta(pdb.birthday, p.age, p.relation);
     let private = Private {
@@ -58,12 +57,10 @@ fn main() {
     };
     let proof = generate_proof(rq).unwrap();
     let ps = proof.to_string();
-    let qrf = QrFile {
-        qr: ps.clone()
-    };
-//    let json: String = serde_json::to_string(&qrf).unwrap();
+    let qrf = QrFile { qr: ps.clone() };
+    //    let json: String = serde_json::to_string(&qrf).unwrap();
     fs::write(p.proof, ps).unwrap();
-//    fs::write(p.proof, json).unwrap();
+    //    fs::write(p.proof, json).unwrap();
 
     let code = QrCode::new(qrf.qr).unwrap();
     let image = code.render::<Luma<u8>>().build();

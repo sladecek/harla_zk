@@ -172,6 +172,7 @@ mod tests {
     use crate::api::{Private, PublicQr, QrRequest, Relation};
     use std::str::FromStr;
     use zokrates_field::Bn128Field;
+    //    use num_bigint::BigUint;
 
     fn bn128(s: &str) -> Bn128Field {
         Bn128Field::try_from_dec_str(s).unwrap()
@@ -237,63 +238,108 @@ mod tests {
 
         assert_eq!(Bn128Field::from_byte_vector(key), m1);
     }
+    /*
+        fn test_verification(today: i32, birthday: i32, relation: Relation, delta: i32, result: bool) {
+            let m1 =
+                bn128("10046037004840239707202533642544953578314335199439499999912878067091298310375");
+            assert_eq!(compute_mimc7r10_hash(&bn128("10000"), &bn128("12")), m1);
 
-    fn test_verification(today: i32, birthday: i32, relation: Relation, delta: i32, result: bool) {
-        let m1 =
-            bn128("10046037004840239707202533642544953578314335199439499999912878067091298310375");
-        assert_eq!(compute_mimc7r10_hash(&bn128("10000"), &bn128("12")), m1);
+            let chain = PublicChain {
+                photo_hash: bn128("3").into_byte_vector(),
+                prover_key: m1.into_byte_vector(),
+            };
+
+            let rq = QrRequest {
+                qr: PublicQr {
+                    today,
+                    relation,
+                    delta,
+                    contract: bn128("4").into_byte_vector(),
+                },
+                chain: chain.clone(),
+                private: Private {
+                    birthday,
+                    nonce: bn128("7999").into_byte_vector(),
+                },
+            };
+
+            let p = super::generate_proof(rq).unwrap();
+            println!("{}", p.to_string());
+            assert_eq!(result, super::verify_proof(&p, &chain).is_ok());
+            let pp = ProofQrCode::from_str(&p.to_string()).unwrap();
+            println!("{}", pp.to_string());
+            assert_eq!(result, super::verify_proof(&pp, &chain).is_ok());
+            println!("------------------");
+        }
+
+        #[test]
+        fn verify_older() {
+            test_verification(2020, 2001, Relation::Older, 18, true);
+        }
+
+        #[test]
+        fn verify_younger() {
+            test_verification(2020, 2001, Relation::Younger, 21, true);
+        }
+
+        #[test]
+        fn verify_invalid() {
+            test_verification(2020, 2010, Relation::Older, 18, false);
+        }
+
+        #[test]
+        fn verify_marginal_case_older() {
+            // Equality is refused. Wait till midnight.
+            test_verification(2020, 2000, Relation::Older, 20, false);
+        }
+
+        #[test]
+        fn verify_marginal_case_younger() {
+            test_verification(2020, 2000, Relation::Older, 20, false);
+        }
+    */
+    #[test]
+    fn verify_bart() {
+        let private = Private {
+            birthday: 2455250,
+            nonce: bn128(
+                "49562589987336948678371811862197518411894129330930510829597277386215323558419",
+            )
+            .into_byte_vector(),
+        };
+
+        //	"0x330e55395b367bab55b24b5377f7fe813735e55d";
+        let contract = bn128("291478163806436998532036252836091753082125673821").into_byte_vector();
+        println!("c {:?}", contract);
+        //	let contract2 = BigUint::from_str("291478163806436998532036252836091753082125673821").unwrap();
+        //        println!("c2 {:?}", contract2.to_bytes_be());
+
+        let photo_hash = bn128("70573743172686605492515124569").into_byte_vector();
+        let prover_key = super::generate_prover_key(&private, &photo_hash, &contract);
+        println!("prover key: {:?}", prover_key);
 
         let chain = PublicChain {
-            photo_hash: bn128("3").into_byte_vector(),
-            prover_key: m1.into_byte_vector(),
+            photo_hash,
+            prover_key,
         };
 
         let rq = QrRequest {
             qr: PublicQr {
-                today,
-                relation,
-                delta,
-                contract: bn128("4").into_byte_vector(),
+                today: 2459231,
+                relation: Relation::Older,
+                delta: 2923,
+                contract,
             },
             chain: chain.clone(),
-            private: Private {
-                birthday,
-                nonce: bn128("7999").into_byte_vector(),
-            },
+            private,
         };
 
         let p = super::generate_proof(rq).unwrap();
         println!("{}", p.to_string());
-        assert_eq!(result, super::verify_proof(&p, &chain).is_ok());
+        assert_eq!(true, super::verify_proof(&p, &chain).is_ok());
         let pp = ProofQrCode::from_str(&p.to_string()).unwrap();
         println!("{}", pp.to_string());
-        assert_eq!(result, super::verify_proof(&pp, &chain).is_ok());
+        assert_eq!(true, super::verify_proof(&pp, &chain).is_ok());
         println!("------------------");
-    }
-
-    #[test]
-    fn verify_older() {
-        test_verification(2020, 2001, Relation::Older, 18, true);
-    }
-
-    #[test]
-    fn verify_younger() {
-        test_verification(2020, 2001, Relation::Younger, 21, true);
-    }
-
-    #[test]
-    fn verify_invalid() {
-        test_verification(2020, 2010, Relation::Older, 18, false);
-    }
-
-    #[test]
-    fn verify_marginal_case_older() {
-        // Equality is refused. Wait till midnight.
-        test_verification(2020, 2000, Relation::Older, 20, false);
-    }
-
-    #[test]
-    fn verify_marginal_case_younger() {
-        test_verification(2020, 2000, Relation::Older, 20, false);
     }
 }
